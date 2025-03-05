@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .form-container {
+            margin-bottom: 20px;
+        }
+        input, select, button {
+            margin: 5px;
+            padding: 5px;
+        }
+        #totalFine {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #currentDate {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Library Manager</h1>
+    
+    <div class="form-container">
+        <input type="text" id="itemName" placeholder="Item Name">
+        <select id="branch">
+            <option value="American">American</option>
+            <option value="Chandni Chowk">Chandni Chowk</option>
+            <option value="Sarojini Nagar">Sarojini Nagar</option>
+        </select>
+        <input type="date" id="renewalDate">
+        <input type="number" id="renewals" placeholder="Renewals Remaining">
+        <button onclick="addItem()">Add Item</button>
+    </div>
+
+    <table id="libraryTable">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Branch</th>
+                <th>Renewal Date</th>
+                <th>Renewals Remaining</th>
+                <th>Fine</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+
+    <div id="totalFine"></div>
+    <div id="currentDate"></div>
+    <button onclick="downloadPDF()" style="margin-top: 20px;">Download as PDF</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    
+    <script>
+        const maxItems = {
+            'American': { max: 6, current: 0, itemCount: {} },
+            'Chandni Chowk': { max: 3, current: 0 },
+            'Sarojini Nagar': { max: 3, current: 0 }
+        };
+
+        // Current date (March 04, 2025, as per system info)
+        const currentDate = new Date('2025-03-04');
+        document.getElementById('currentDate').textContent = `Current Date: ${currentDate.toDateString()}`;
+
+        function calculateFine(branch, renewalDate) {
+            const renewal = new Date(renewalDate);
+            const diffTime = currentDate - renewal;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (branch === 'American') {
+                return diffDays >= 0 ? `${diffDays} days overdue` : `${Math.abs(diffDays)} days until due`;
+            } else {
+                if (diffDays > 0) {
+                    const fine = diffDays * 2; // 2 Rs per book per day
+                    return `${fine} Rs`;
+                } else {
+                    return 'No fine';
+                }
+            }
+        }
+
+        function updateTotalFine() {
+            const rows = document.getElementById('tableBody').rows;
+            let totalFine = 0;
+
+            for (let row of rows) {
+                const fineText = row.cells[4].textContent;
+                if (fineText.includes('Rs')) {
+                    const fineValue = parseInt(fineText.replace(' Rs', ''));
+                    totalFine += fineValue;
+                }
+            }
+
+            document.getElementById('totalFine').textContent = `Total Fine Due: ${totalFine} Rs`;
+            return totalFine;
+        }
+
+        function addItem() {
+            const itemName = document.getElementById('itemName').value.trim();
+            const branch = document.getElementById('branch').value;
+            const renewalDate = document.getElementById('renewalDate').value;
+            const renewals = parseInt(document.getElementById('renewals').value);
+
+            if (!itemName || !renewalDate || isNaN(renewals)) {
+                alert('Please fill all fields');
+                return;
+            }
+
+            const library = maxItems[branch];
+            if (library.current >= library.max) {
+                alert(`Maximum items limit reached for ${branch} Library`);
+                return;
+            }
+
+            if (branch === 'American') {
+                if (renewals < 0 || renewals > 4) {
+                    alert('Renewals for American Library must be between 0 and 4');
+                    return;
+                }
+                library.itemCount[itemName] = (library.itemCount[itemName] || 0) + 1;
+            } else {
+                if (renewals < 0 || renewals > 2) {
+                    alert(`Renewals for ${branch} Library must be between 0 and 2`);
+                    return;
+                }
+            }
+
+            library.current++;
+
+            const calculatedFine = calculateFine(branch, renewalDate);
+
+            const tableBody = document.getElementById('tableBody');
+            const row = tableBody.insertRow();
+            row.insertCell(0).textContent = itemName;
+            row.insertCell(1).textContent = branch;
+            row.insertCell(2).textContent = renewalDate;
+            row.insertCell(3).textContent = renewals;
+            row.insertCell(4).textContent = calculatedFine;
+
+            document.getElementById('itemName').value = '';
+            document.getElementById('renewalDate').value = '';
+            document.getElementById('renewals').value = '';
+
+            updateTotalFine();
+        }
+
+        function downloadPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFont("times", "normal");
+            doc.setFontSize(12);
+            doc.text('Library Manager', 10, 10);
+
+            const table = document.getElementById('libraryTable');
+            const headers = ['Item', 'Branch', 'Renewal Date', 'Renewals Remaining', 'Fine'];
+            const data = [];
+
+            const rows = table.getElementsByTagName('tbody')[0].rows;
+            for (let row of rows) {
+                const rowData = [];
+                for (let cell of row.cells) {
+                    rowData.push(cell.textContent);
+                }
+                data.push(rowData);
+            }
+
+            doc.autoTable({
+                head: [headers],
+                body: data,
+                startY: 20,
+                styles: { font: 'times', fontSize: 10 },
+                headStyles: { fillColor: [200, 200, 200] }
+            });
+
+            const totalFine = updateTotalFine();
+            const finalY = doc.lastAutoTable.finalY || 20;
+
+            doc.setFont("times", "normal");
+            doc.setFontSize(10);
+            doc.text(`Total Fine Due: ${totalFine} Rs`, 10, finalY + 10);
+            doc.text(`Current Date: ${currentDate.toDateString()}`, 10, finalY + 20);
+
+            doc.save('library_list.pdf');
+        }
+    </script>
+</body>
+</html>
