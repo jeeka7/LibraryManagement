@@ -80,20 +80,31 @@
             'Sarojini Nagar': { max: 3, current: 0 }
         };
 
-        // Current date (March 04, 2025, as per system info)
-        const currentDate = new Date('2025-03-04');
-        document.getElementById('currentDate').textContent = `Current Date: ${currentDate.toDateString()}`;
+        // Get current UTC time and adjust to IST (UTC+5:30)
+        const utcDate = new Date();
+        const istOffsetMs = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+        const currentDate = new Date(utcDate.getTime() + istOffsetMs);
+
+        // Display the IST date
+        const istDateString = currentDate.toLocaleString('en-US', { 
+            timeZone: 'Asia/Kolkata', 
+            weekday: 'short', 
+            year: 'numeric', 
+            month: 'short', 
+            day: '2-digit' 
+        });
+        document.getElementById('currentDate').textContent = `Current Date: ${istDateString}`;
 
         function calculateFine(branch, renewalDate) {
             const renewal = new Date(renewalDate);
-            const diffTime = currentDate - renewal;
+            const diffTime = currentDate - renewal; // Now uses IST-adjusted currentDate
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             if (branch === 'American') {
                 return diffDays >= 0 ? `${diffDays} days overdue` : `${Math.abs(diffDays)} days until due`;
             } else {
                 if (diffDays > 0) {
-                    const fine = diffDays * 2; // 2 Rs per book per day
+                    const fine = diffDays * 2;
                     return `${fine} Rs`;
                 } else {
                     return 'No fine';
@@ -201,7 +212,7 @@
             doc.setFont("times", "normal");
             doc.setFontSize(10);
             doc.text(`Total Fine Due: ${totalFine} Rs`, 10, finalY + 10);
-            doc.text(`Current Date: ${currentDate.toDateString()}`, 10, finalY + 20);
+            doc.text(`Current Date: ${istDateString}`, 10, finalY + 20);
 
             doc.save('library_list.pdf');
         }
